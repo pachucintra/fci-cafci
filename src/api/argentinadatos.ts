@@ -35,10 +35,10 @@ interface RawEntry {
 }
 
 const CATEGORIAS = [
-  { path: '/argentinadatos/v1/finanzas/fci/mercadoDinero', tipo: 'Mercado de Dinero' },
-  { path: '/argentinadatos/v1/finanzas/fci/rentaFija', tipo: 'Renta Fija' },
-  { path: '/argentinadatos/v1/finanzas/fci/rentaVariable', tipo: 'Renta Variable' },
-  { path: '/argentinadatos/v1/finanzas/fci/rentaMixta', tipo: 'Renta Mixta' },
+  { path: '/argentinadatos/v1/finanzas/fci/mercadoDinero/ultimo', tipo: 'Mercado de Dinero' },
+  { path: '/argentinadatos/v1/finanzas/fci/rentaFija/ultimo', tipo: 'Renta Fija' },
+  { path: '/argentinadatos/v1/finanzas/fci/rentaVariable/ultimo', tipo: 'Renta Variable' },
+  { path: '/argentinadatos/v1/finanzas/fci/rentaMixta/ultimo', tipo: 'Renta Mixta' },
 ]
 
 function latestPerFund(raw: RawEntry[], tipo: string): Fondo[] {
