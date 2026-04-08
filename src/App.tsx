@@ -1,101 +1,150 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Header } from './components/Header'
 import { FundCard } from './components/FundCard'
 import { FundDetail } from './components/FundDetail'
-import { FundSearchModal } from './components/FundSearchModal'
-import type { FondoTracked } from './types/fund'
+import { getFondos } from './api/cafci'
 
-const STORAGE_KEY = 'fci_tracked_fondos'
-
-const DEFAULT_FONDOS: FondoTracked[] = [
-  { fondoId: 847, claseId: 2409, nombre: 'Fondo 847 – Demo', claseNombre: 'Clase 2409', gestora: 'CAFCI', tipoFondo: 'Renta Fija' },
-]
-
-function loadFondos(): FondoTracked[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as FondoTracked[]
-  } catch { /* ignore */ }
-  return DEFAULT_FONDOS
+interface Fondo {
+  id: number
+  nombre: string
+  tipoFondo: { id: number; descripcion: string }
+  gestora: { id: number; nombre: string }
 }
 
-function saveFondos(fondos: FondoTracked[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(fondos))
-}
+const PAGE_SIZE = 50
 
 export default function App() {
-  const [fondos, setFondos] = useState<FondoTracked[]>(loadFondos)
+  const [fondos, setFondos] = useState<Fondo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [selectedFondo, setSelectedFondo] = useState<FondoTracked | null>(null)
-  const [showModal, setShowModal] = useState(false)
+  const [tipoFiltro, setTipoFiltro] = useState<string>('todos')
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [selectedFondo, setSelectedFondo] = useState<Fondo | null>(null)
+  const [tipos, setTipos] = useState<string[]>([])
 
-  useEffect(() => {
-    saveFondos(fondos)
-  }, [fondos])
+  const fetchFondos = useCallback(async (p: number, nombre: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res: any = await getFondos({ nombre: nombre || undefined, limit: PAGE_SIZE, page: p })
+      const data: Fondo[] = res?.data ?? (Array.isArray(res) ? res : [])
 
-  const handleAdd = (
-    fondoId: number,
-    claseId: number,
-    nombre: string,
-    claseNombre: string,
-    gestora: string,
-    tipoFondo: string,
-  ) => {
-    const exists = fondos.some((f) => f.fondoId === fondoId && f.claseId === claseId)
-    if (exists) return
-    setFondos((prev) => [...prev, { fondoId, claseId, nombre, claseNombre, gestora, tipoFondo }])
-  }
+      if (p === 1) {
+        setFondos(data)
+        // collect unique tipos for filter chips
+        const ts = [...new Set(data.map((f) => f.tipoFondo.descripcion))].sort()
+        setTipos(ts)
+      } else {
+        setFondos((prev) => [...prev, ...data])
+      }
 
-  const handleRemove = (fondoId: number, claseId: number) => {
-    setFondos((prev) => prev.filter((f) => !(f.fondoId === fondoId && f.claseId === claseId)))
-    if (selectedFondo?.fondoId === fondoId && selectedFondo?.claseId === claseId) {
-      setSelectedFondo(null)
+      const total: number = res?.total ?? res?.count ?? data.length
+      setHasMore(p * PAGE_SIZE < total)
+    } catch {
+      setError('No se pudo conectar con la API de CAFCI. Verificá tu conexión o intentá más tarde.')
+    } finally {
+      setLoading(false)
     }
+  }, [])
+
+  // Initial load
+  useEffect(() => {
+    fetchFondos(1, '')
+  }, [fetchFondos])
+
+  // Search with debounce
+  useEffect(() => {
+    setPage(1)
+    const t = setTimeout(() => fetchFondos(1, search), 400)
+    return () => clearTimeout(t)
+  }, [search, fetchFondos])
+
+  const loadMore = () => {
+    const next = page + 1
+    setPage(next)
+    fetchFondos(next, search)
   }
 
-  const filtered = fondos.filter(
-    (f) =>
-      !search ||
-      f.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      f.gestora.toLowerCase().includes(search.toLowerCase()) ||
-      f.tipoFondo.toLowerCase().includes(search.toLowerCase()),
-  )
+  const filtered = tipoFiltro === 'todos'
+    ? fondos
+    : fondos.filter((f) => f.tipoFondo.descripcion === tipoFiltro)
 
   return (
     <div className="app">
       <Header search={search} onSearch={setSearch} />
 
       <main className="main">
-        {/* Toolbar */}
-        <div className="toolbar">
-          <p className="toolbar-count">
-            {filtered.length} {filtered.length === 1 ? 'fondo' : 'fondos'} tracked
-          </p>
-          <button className="btn-primary" onClick={() => setShowModal(true)}>
-            + Agregar fondo
-          </button>
-        </div>
-
-        {/* Grid */}
-        {filtered.length === 0 ? (
-          <div className="empty-state">
-            <span className="empty-icon">📭</span>
-            <p>No hay fondos guardados.</p>
-            <button className="btn-primary" onClick={() => setShowModal(true)}>
-              Agregar mi primer fondo
+        {/* Tipo filter chips */}
+        {tipos.length > 0 && (
+          <div className="filter-chips">
+            <button
+              className={`chip ${tipoFiltro === 'todos' ? 'active' : ''}`}
+              onClick={() => setTipoFiltro('todos')}
+            >
+              Todos
             </button>
-          </div>
-        ) : (
-          <div className="fund-grid">
-            {filtered.map((f) => (
-              <FundCard
-                key={`${f.fondoId}-${f.claseId}`}
-                fondo={f}
-                onClick={() => setSelectedFondo(f)}
-                onRemove={() => handleRemove(f.fondoId, f.claseId)}
-              />
+            {tipos.map((t) => (
+              <button
+                key={t}
+                className={`chip ${tipoFiltro === t ? 'active' : ''}`}
+                onClick={() => setTipoFiltro(t)}
+              >
+                {t}
+              </button>
             ))}
           </div>
+        )}
+
+        {/* Count */}
+        {!loading && !error && (
+          <p className="toolbar-count">{filtered.length} fondos</p>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="error-banner">
+            <span>⚠️ {error}</span>
+            <button className="btn-retry" onClick={() => fetchFondos(1, search)}>Reintentar</button>
+          </div>
+        )}
+
+        {/* Grid */}
+        {filtered.length === 0 && !loading && !error ? (
+          <div className="empty-state">
+            <span className="empty-icon">🔍</span>
+            <p>No se encontraron fondos para "{search}"</p>
+          </div>
+        ) : (
+          <>
+            <div className="fund-grid">
+              {filtered.map((f) => (
+                <FundCard
+                  key={f.id}
+                  fondo={f}
+                  onClick={() => setSelectedFondo(f)}
+                />
+              ))}
+              {/* Skeleton cards while loading */}
+              {loading && Array.from({ length: 12 }).map((_, i) => (
+                <div key={`sk-${i}`} className="fund-card skeleton-card">
+                  <div className="skeleton" style={{ width: '60%', height: 12, marginBottom: 8 }} />
+                  <div className="skeleton" style={{ width: '90%', height: 16, marginBottom: 6 }} />
+                  <div className="skeleton" style={{ width: '70%', height: 12 }} />
+                </div>
+              ))}
+            </div>
+
+            {hasMore && !loading && (
+              <div className="load-more">
+                <button className="btn-primary" onClick={loadMore}>
+                  Cargar más fondos
+                </button>
+              </div>
+            )}
+          </>
         )}
       </main>
 
@@ -104,14 +153,6 @@ export default function App() {
         <FundDetail
           fondo={selectedFondo}
           onClose={() => setSelectedFondo(null)}
-        />
-      )}
-
-      {/* Search/add modal */}
-      {showModal && (
-        <FundSearchModal
-          onAdd={handleAdd}
-          onClose={() => setShowModal(false)}
         />
       )}
     </div>
