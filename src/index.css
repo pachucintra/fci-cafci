@@ -110,7 +110,7 @@ a { color: var(--accent); }
   justify-content: space-between;
   margin-bottom: 24px;
 }
-.toolbar-count { font-size: 13px; color: var(--text-muted); }
+.toolbar-count { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
 
 /* ═══════════════════════════════════════════
    Buttons
@@ -259,6 +259,34 @@ a { color: var(--accent); }
   padding-right: 20px;
 }
 .fund-clase { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
+
+.fund-var {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.04);
+}
+.fund-var.pos { color: var(--positive); background: rgba(76,175,125,.1); }
+.fund-var.neg { color: var(--negative); background: rgba(224,82,82,.1); }
+
+.fund-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  gap: 8px;
+}
+.fund-vcp { font-size: 13px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.fund-clase-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tag-text);
+  background: var(--tag-bg);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
 
 .fund-metrics { display: flex; flex-direction: column; gap: 8px; }
 .metric { display: flex; justify-content: space-between; align-items: center; }
