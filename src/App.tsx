@@ -43,8 +43,8 @@ export default function App() {
 
       const total: number = res?.total ?? res?.count ?? data.length
       setHasMore(p * PAGE_SIZE < total)
-    } catch {
-      setError('No se pudo conectar con la API de CAFCI. Verificá tu conexión o intentá más tarde.')
+    } catch (e) {
+      setError(String(e))
     } finally {
       setLoading(false)
     }

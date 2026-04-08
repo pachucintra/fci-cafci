@@ -9,9 +9,16 @@
 const BASE = import.meta.env.VITE_API_BASE ?? '/api'
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`)
+  const url = `${BASE}${path}`
+  let res: Response
+  try {
+    res = await fetch(url)
+  } catch (e) {
+    throw new Error(`Network error calling ${url}: ${e}`)
+  }
   if (!res.ok) {
-    throw new Error(`CAFCI API error ${res.status}: ${res.statusText}`)
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status} ${res.statusText} — ${url} — ${body.slice(0, 200)}`)
   }
   return res.json() as Promise<T>
 }
