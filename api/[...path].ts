@@ -18,7 +18,13 @@ export default async function handler(req: Request): Promise<Response> {
   if (apiPath.startsWith('/argentinadatos/')) {
     const adPath = apiPath.replace(/^\/argentinadatos/, '')
     targetUrl = `https://api.argentinadatos.com${adPath}${url.search}`
-    reqHeaders = { 'Accept': 'application/json' }
+    reqHeaders = {
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'es-AR,es;q=0.9',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Referer': 'https://argentinadatos.com/',
+      'Origin': 'https://argentinadatos.com',
+    }
   } else {
     targetUrl = `https://api.cafci.org.ar${apiPath}${url.search}`
     reqHeaders = CAFCI_HEADERS

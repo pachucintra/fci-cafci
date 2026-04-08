@@ -62,21 +62,26 @@ function parseFondo(raw: RawEntry, tipo: string): Fondo {
 
 /** Fetches a category endpoint, trying up to 4 days back to skip weekends/holidays. */
 async function fetchCategory(apiPath: string, tipo: string): Promise<Fondo[]> {
+  const errs: string[] = []
   for (let daysBack = 1; daysBack <= 4; daysBack++) {
     const path = `${apiPath}/${dateStr(daysBack)}`
     try {
       const data = await get<RawEntry[]>(path)
-      if (!Array.isArray(data)) continue
+      if (!Array.isArray(data)) {
+        errs.push(`${dateStr(daysBack)}: respuesta no es array`)
+        continue
+      }
       // Filter out metadata rows (null vcp or null fecha)
       const valid = data.filter((r) => r.vcp !== null && r.vcp !== undefined && r.fecha)
       if (valid.length > 0) {
         return valid.map((r) => parseFondo(r, tipo))
       }
-    } catch {
-      // try the previous day
+      errs.push(`${dateStr(daysBack)}: 0 entradas válidas`)
+    } catch (e) {
+      errs.push(`${dateStr(daysBack)}: ${e}`)
     }
   }
-  throw new Error(`Sin datos disponibles (últimos 4 días)`)
+  throw new Error(errs.join(' | '))
 }
 
 const CATEGORIAS = [
