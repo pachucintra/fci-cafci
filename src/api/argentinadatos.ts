@@ -20,55 +20,75 @@ export interface Fondo {
   clase: string
   tipo: string
   vcp: number
-  variacion: number
+  patrimonio: number | null
   fecha: string
+  horizonte: string
 }
 
 interface RawEntry {
   fondo?: string
-  nombre?: string
-  clase?: string
-  vcp?: number
-  variacion?: number
-  fecha?: string
-  [key: string]: unknown
+  horizonte?: string
+  fecha?: string | null
+  vcp?: number | null
+  ccp?: number | null
+  patrimonio?: number | null
+}
+
+/** Returns YYYY/MM/DD for `daysBack` days ago in local time. */
+function dateStr(daysBack: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - daysBack)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}/${m}/${day}`
+}
+
+function parseFondo(raw: RawEntry, tipo: string): Fondo {
+  const name = raw.fondo ?? ''
+  const match = name.match(/^(.+?)\s+-\s+Clase\s+(.+)$/)
+  const nombre = match ? match[1].trim() : name.trim()
+  const clase = match ? match[2].trim() : ''
+  return {
+    nombre,
+    clase,
+    tipo,
+    vcp: raw.vcp ?? 0,
+    patrimonio: raw.patrimonio ?? null,
+    fecha: raw.fecha ?? '',
+    horizonte: raw.horizonte ?? '',
+  }
+}
+
+/** Fetches a category endpoint, trying up to 4 days back to skip weekends/holidays. */
+async function fetchCategory(apiPath: string, tipo: string): Promise<Fondo[]> {
+  for (let daysBack = 1; daysBack <= 4; daysBack++) {
+    const path = `${apiPath}/${dateStr(daysBack)}`
+    try {
+      const data = await get<RawEntry[]>(path)
+      if (!Array.isArray(data)) continue
+      // Filter out metadata rows (null vcp or null fecha)
+      const valid = data.filter((r) => r.vcp !== null && r.vcp !== undefined && r.fecha)
+      if (valid.length > 0) {
+        return valid.map((r) => parseFondo(r, tipo))
+      }
+    } catch {
+      // try the previous day
+    }
+  }
+  throw new Error(`Sin datos disponibles (últimos 4 días)`)
 }
 
 const CATEGORIAS = [
-  { path: '/argentinadatos/v1/finanzas/fci/mercadoDinero/ultimo', tipo: 'Mercado de Dinero' },
-  { path: '/argentinadatos/v1/finanzas/fci/rentaFija/ultimo', tipo: 'Renta Fija' },
-  { path: '/argentinadatos/v1/finanzas/fci/rentaVariable/ultimo', tipo: 'Renta Variable' },
-  { path: '/argentinadatos/v1/finanzas/fci/rentaMixta/ultimo', tipo: 'Renta Mixta' },
+  { path: '/argentinadatos/v1/finanzas/fci/mercadoDinero', tipo: 'Mercado de Dinero' },
+  { path: '/argentinadatos/v1/finanzas/fci/rentaFija', tipo: 'Renta Fija' },
+  { path: '/argentinadatos/v1/finanzas/fci/rentaVariable', tipo: 'Renta Variable' },
+  { path: '/argentinadatos/v1/finanzas/fci/rentaMixta', tipo: 'Renta Mixta' },
 ]
-
-function latestPerFund(raw: RawEntry[], tipo: string): Fondo[] {
-  // Some endpoints return all historical rows; keep only the latest per (fondo, clase)
-  const map = new Map<string, RawEntry>()
-  for (const item of raw) {
-    const key = `${item.fondo ?? item.nombre ?? ''}|${item.clase ?? ''}`
-    const existing = map.get(key)
-    if (!existing || (item.fecha ?? '') > (existing.fecha ?? '')) {
-      map.set(key, item)
-    }
-  }
-  return Array.from(map.values()).map((item) => ({
-    nombre: item.fondo ?? item.nombre ?? '',
-    clase: item.clase ?? '',
-    tipo,
-    vcp: item.vcp ?? 0,
-    variacion: item.variacion ?? 0,
-    fecha: item.fecha ?? '',
-  })).filter((f) => f.nombre !== '')
-}
 
 export async function getAllFondos(): Promise<Fondo[]> {
   const results = await Promise.allSettled(
-    CATEGORIAS.map(({ path, tipo }) =>
-      get<RawEntry[]>(path).then((data) => {
-        if (!Array.isArray(data)) return []
-        return latestPerFund(data, tipo)
-      })
-    )
+    CATEGORIAS.map(({ path, tipo }) => fetchCategory(path, tipo))
   )
 
   const fondos: Fondo[] = []

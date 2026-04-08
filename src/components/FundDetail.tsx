@@ -7,12 +7,14 @@ interface Props {
 }
 
 function fmtVcp(n: number) {
-  return n.toLocaleString('es-AR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+  return n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 }
 
-function fmtVar(n: number) {
-  const pct = Math.abs(n) <= 1 ? n * 100 : n
-  return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`
+function fmtPatrimonio(n: number | null) {
+  if (n === null || n === 0) return '—'
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  return `$${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
 }
 
 export function FundDetail({ fondo, onClose }: Props) {
@@ -21,10 +23,6 @@ export function FundDetail({ fondo, onClose }: Props) {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
-
-  const varPct = Math.abs(fondo.variacion) <= 1 ? fondo.variacion * 100 : fondo.variacion
-  const isPos = varPct > 0
-  const isNeg = varPct < 0
 
   const cafciSearch = encodeURIComponent(fondo.nombre)
 
@@ -37,6 +35,7 @@ export function FundDetail({ fondo, onClose }: Props) {
             <div className="detail-tags">
               <span className="fund-tag">{fondo.tipo}</span>
               {fondo.clase && <span className="fund-gestora">{fondo.clase}</span>}
+              {fondo.horizonte && <span className="fund-gestora">{fondo.horizonte}</span>}
             </div>
             <h2 className="detail-nombre">{fondo.nombre}</h2>
           </div>
@@ -49,15 +48,19 @@ export function FundDetail({ fondo, onClose }: Props) {
             <span className="kpi-value">${fmtVcp(fondo.vcp)}</span>
           </div>
           <div className="kpi">
-            <span className="kpi-label">Variación diaria</span>
-            <span className={`kpi-value rend ${isPos ? 'pos' : isNeg ? 'neg' : ''}`}>
-              {fmtVar(fondo.variacion)}
-            </span>
+            <span className="kpi-label">Patrimonio</span>
+            <span className="kpi-value">{fmtPatrimonio(fondo.patrimonio)}</span>
           </div>
           {fondo.fecha && (
             <div className="kpi">
               <span className="kpi-label">Fecha</span>
               <span className="kpi-value">{fondo.fecha}</span>
+            </div>
+          )}
+          {fondo.horizonte && (
+            <div className="kpi">
+              <span className="kpi-label">Horizonte</span>
+              <span className="kpi-value" style={{ textTransform: 'capitalize' }}>{fondo.horizonte}</span>
             </div>
           )}
         </div>
