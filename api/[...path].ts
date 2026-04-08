@@ -7,7 +7,13 @@ export default async function handler(req: Request): Promise<Response> {
 
   try {
     const response = await fetch(targetUrl, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      headers: {
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'es-AR,es;q=0.9',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Referer': 'https://www.cafci.org.ar/',
+        'Origin': 'https://www.cafci.org.ar',
+      },
     })
     const body = await response.text()
     return new Response(body, {
@@ -17,8 +23,8 @@ export default async function handler(req: Request): Promise<Response> {
         'Access-Control-Allow-Origin': '*',
       },
     })
-  } catch {
-    return new Response(JSON.stringify({ error: 'Proxy error' }), {
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })
