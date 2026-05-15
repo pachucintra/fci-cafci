@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth'
 import { AppView, Patient, Session } from './types'
 import { useToast } from './hooks/useToast'
 import { Header } from './components/layout/Header'
+import { AccountModal } from './components/AccountModal'
 import { ToastContainer } from './components/ui/Toast'
 import { LoadingScreen } from './components/ui/Spinner'
 import { SetupView } from './views/SetupView'
@@ -16,6 +17,7 @@ import { SessionFormView } from './views/SessionFormView'
 export default function App() {
   const [configured, setConfigured] = useState(isConfigured())
   const [showSetup, setShowSetup] = useState(!isConfigured())
+  const [showAccount, setShowAccount] = useState(false)
   const [view, setView] = useState<AppView>('list')
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
@@ -67,7 +69,7 @@ export default function App() {
     }
     switch (view) {
       case 'list':
-        return { ...base, onSettingsClick: () => setShowSetup(true) }
+        return { ...base, onSettingsClick: () => setShowAccount(true) }
       case 'patientForm':
         return {
           ...base,
@@ -128,6 +130,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Header {...getHeaderProps()} />
+      {showAccount && user?.email && (
+        <AccountModal email={user.email} onClose={() => setShowAccount(false)} />
+      )}
 
       <main>
         {view === 'list' && (
