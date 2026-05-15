@@ -14,7 +14,7 @@ export const usePatients = () => {
       const client = getClient()
       const { data, error: err } = await client
         .from('patients')
-        .select('*')
+        .select('*, sessions(id, fecha, dolor)')
         .order('apellido', { ascending: true })
       if (err) throw err
       setPatients(data || [])

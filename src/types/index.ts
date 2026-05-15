@@ -40,6 +40,12 @@ export interface PainPoint {
   y: number
 }
 
+export interface ToastMessage {
+  id: string
+  type: 'success' | 'error' | 'warning' | 'info'
+  message: string
+}
+
 export type PatientFormData = Omit<Patient, 'id' | 'created_at' | 'sessions'>
 
 export type SessionFormData = Omit<Session, 'id' | 'created_at'>

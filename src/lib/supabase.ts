@@ -16,7 +16,7 @@ let _client: SupabaseClient | null = null
 export const getClient = (): SupabaseClient => {
   const { url, key } = getSupabaseConfig()
   if (!url || !key) throw new Error('Supabase no configurado')
-  if (!_client || _client.supabaseUrl !== url) {
+  if (!_client) {
     _client = createClient(url, key)
   }
   return _client
