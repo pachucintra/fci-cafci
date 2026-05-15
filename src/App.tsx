@@ -1,133 +1,181 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Header } from './components/Header'
-import { FundCard } from './components/FundCard'
-import { FundDetail } from './components/FundDetail'
-import { getAllFondos, type Fondo } from './api/argentinadatos'
-
-const PAGE_SIZE = 60
+import { useState, useEffect } from 'react'
+import { isConfigured } from './lib/supabase'
+import { AppView, Patient, Session } from './types'
+import { useToast } from './hooks/useToast'
+import { Header } from './components/layout/Header'
+import { ToastContainer } from './components/ui/Toast'
+import { SetupView } from './views/SetupView'
+import { PatientListView } from './views/PatientListView'
+import { PatientFormView } from './views/PatientFormView'
+import { PatientDetailView } from './views/PatientDetailView'
+import { SessionFormView } from './views/SessionFormView'
 
 export default function App() {
-  const [allFondos, setAllFondos] = useState<Fondo[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [tipoFiltro, setTipoFiltro] = useState<string>('todos')
-  const [page, setPage] = useState(1)
-  const [selectedFondo, setSelectedFondo] = useState<Fondo | null>(null)
-  const [tipos, setTipos] = useState<string[]>([])
+  const [view, setView] = useState<AppView>(() =>
+    isConfigured() ? 'list' : 'setup'
+  )
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
+  const [editingSession, setEditingSession] = useState<Session | null>(null)
 
-  const fetchFondos = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await getAllFondos()
-      setAllFondos(data)
-      const ts = [...new Set(data.map((f) => f.tipo))].sort()
-      setTipos(ts)
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setLoading(false)
+  const { toasts, addToast, removeToast } = useToast()
+
+  // Re-check config on changes
+  useEffect(() => {
+    if (!isConfigured() && view !== 'setup') {
+      setView('setup')
     }
-  }, [])
+  }, [view])
 
-  useEffect(() => {
-    fetchFondos()
-  }, [fetchFondos])
+  const goToList = () => {
+    setView('list')
+    setSelectedPatient(null)
+    setEditingPatient(null)
+    setEditingSession(null)
+  }
 
-  // Reset page when search/filter changes
-  useEffect(() => {
-    setPage(1)
-  }, [search, tipoFiltro])
+  const goToDetail = (patient: Patient) => {
+    setSelectedPatient(patient)
+    setView('detail')
+  }
 
-  const filtered = allFondos
-    .filter((f) => tipoFiltro === 'todos' || f.tipo === tipoFiltro)
-    .filter((f) => !search || f.nombre.toLowerCase().includes(search.toLowerCase()))
+  const goToNewPatient = () => {
+    setEditingPatient(null)
+    setView('patientForm')
+  }
 
-  const visible = filtered.slice(0, page * PAGE_SIZE)
-  const hasMore = visible.length < filtered.length
+  const goToNewSession = (patient: Patient) => {
+    setSelectedPatient(patient)
+    setEditingSession(null)
+    setView('sessionForm')
+  }
+
+  const goToEditSession = (session: Session, patient: Patient) => {
+    setSelectedPatient(patient)
+    setEditingSession(session)
+    setView('sessionForm')
+  }
+
+  // Header props based on current view
+  const getHeaderProps = () => {
+    switch (view) {
+      case 'setup':
+        return { onLogoClick: goToList }
+      case 'list':
+        return {
+          onLogoClick: goToList,
+          onSettingsClick: () => setView('setup'),
+        }
+      case 'patientForm':
+        return {
+          onLogoClick: goToList,
+          title: editingPatient
+            ? `Editar: ${editingPatient.nombre} ${editingPatient.apellido}`
+            : 'Nuevo Paciente',
+          backLabel: 'Pacientes',
+          onBack: editingPatient && selectedPatient
+            ? () => goToDetail(selectedPatient)
+            : goToList,
+        }
+      case 'detail':
+        return {
+          onLogoClick: goToList,
+          title: selectedPatient
+            ? `${selectedPatient.nombre} ${selectedPatient.apellido}`
+            : '',
+          backLabel: 'Pacientes',
+          onBack: goToList,
+        }
+      case 'sessionForm':
+        return {
+          onLogoClick: goToList,
+          title: editingSession ? 'Editar sesión' : 'Nueva sesión',
+          backLabel: selectedPatient
+            ? `${selectedPatient.nombre} ${selectedPatient.apellido}`
+            : 'Paciente',
+          onBack: selectedPatient ? () => goToDetail(selectedPatient) : goToList,
+        }
+      default:
+        return { onLogoClick: goToList }
+    }
+  }
+
+  if (view === 'setup') {
+    return (
+      <>
+        <SetupView
+          onComplete={() => {
+            setView('list')
+            addToast('Supabase configurado correctamente', 'success')
+          }}
+        />
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
+      </>
+    )
+  }
 
   return (
-    <div className="app">
-      <Header search={search} onSearch={setSearch} />
+    <div className="min-h-screen bg-slate-50">
+      <Header {...getHeaderProps()} />
 
-      <main className="main">
-        {/* Tipo filter chips */}
-        {tipos.length > 0 && (
-          <div className="filter-chips">
-            <button
-              className={`chip ${tipoFiltro === 'todos' ? 'active' : ''}`}
-              onClick={() => setTipoFiltro('todos')}
-            >
-              Todos
-            </button>
-            {tipos.map((t) => (
-              <button
-                key={t}
-                className={`chip ${tipoFiltro === t ? 'active' : ''}`}
-                onClick={() => setTipoFiltro(t)}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+      <main>
+        {view === 'list' && (
+          <PatientListView
+            onSelectPatient={goToDetail}
+            onNewPatient={goToNewPatient}
+          />
         )}
 
-        {/* Count */}
-        {!loading && !error && (
-          <p className="toolbar-count">{filtered.length} fondos</p>
+        {view === 'patientForm' && (
+          <PatientFormView
+            patient={editingPatient}
+            onBack={() => {
+              if (editingPatient && selectedPatient) {
+                goToDetail(selectedPatient)
+              } else {
+                goToList()
+              }
+            }}
+            onSaved={(patient) => {
+              goToDetail(patient)
+              addToast(
+                editingPatient ? 'Paciente actualizado' : 'Paciente creado',
+                'success'
+              )
+            }}
+            addToast={addToast}
+          />
         )}
 
-        {/* Error */}
-        {error && (
-          <div className="error-banner">
-            <span>⚠️ {error}</span>
-            <button className="btn-retry" onClick={fetchFondos}>Reintentar</button>
-          </div>
+        {view === 'detail' && selectedPatient && (
+          <PatientDetailView
+            patient={selectedPatient}
+            onBack={goToList}
+            onEditPatient={(p) => {
+              setEditingPatient(p)
+              setView('patientForm')
+            }}
+            onNewSession={goToNewSession}
+            onEditSession={goToEditSession}
+            onPatientDeleted={goToList}
+            addToast={addToast}
+          />
         )}
 
-        {/* Grid */}
-        {filtered.length === 0 && !loading && !error ? (
-          <div className="empty-state">
-            <span className="empty-icon">🔍</span>
-            <p>No se encontraron fondos para "{search}"</p>
-          </div>
-        ) : (
-          <>
-            <div className="fund-grid">
-              {visible.map((f, i) => (
-                <FundCard
-                  key={`${f.nombre}|${f.clase}|${i}`}
-                  fondo={f}
-                  onClick={() => setSelectedFondo(f)}
-                />
-              ))}
-              {loading && Array.from({ length: 12 }).map((_, i) => (
-                <div key={`sk-${i}`} className="fund-card skeleton-card">
-                  <div className="skeleton" style={{ width: '60%', height: 12, marginBottom: 8 }} />
-                  <div className="skeleton" style={{ width: '90%', height: 16, marginBottom: 6 }} />
-                  <div className="skeleton" style={{ width: '50%', height: 14 }} />
-                </div>
-              ))}
-            </div>
-
-            {hasMore && !loading && (
-              <div className="load-more">
-                <button className="btn-primary" onClick={() => setPage((p) => p + 1)}>
-                  Cargar más fondos
-                </button>
-              </div>
-            )}
-          </>
+        {view === 'sessionForm' && selectedPatient && (
+          <SessionFormView
+            patient={selectedPatient}
+            session={editingSession}
+            onBack={() => goToDetail(selectedPatient)}
+            onSaved={() => {
+              goToDetail(selectedPatient)
+            }}
+            addToast={addToast}
+          />
         )}
       </main>
 
-      {selectedFondo && (
-        <FundDetail
-          fondo={selectedFondo}
-          onClose={() => setSelectedFondo(null)}
-        />
-      )}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   )
 }
