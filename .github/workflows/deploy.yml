@@ -24,15 +24,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build with Vercel (env vars baked in)
-        run: npx vercel@latest build --prod --token "${{ secrets.VERCEL_TOKEN }}" --yes
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-
-      - name: Deploy prebuilt to Vercel
+      - name: Deploy to Vercel (build-env baked in)
         run: |
-          npx vercel@latest deploy --prebuilt --prod \
+          npx vercel@latest deploy \
             --token "${{ secrets.VERCEL_TOKEN }}" \
+            --prod \
+            --yes \
+            --build-env VITE_SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}" \
+            --build-env VITE_SUPABASE_ANON_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY }}" \
             2>&1 | tee /tmp/vercel-out.txt
           cat /tmp/vercel-out.txt
