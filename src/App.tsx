@@ -1,31 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { isConfigured } from './lib/supabase'
+import { useAuth } from './hooks/useAuth'
 import { AppView, Patient, Session } from './types'
 import { useToast } from './hooks/useToast'
 import { Header } from './components/layout/Header'
 import { ToastContainer } from './components/ui/Toast'
+import { LoadingScreen } from './components/ui/Spinner'
 import { SetupView } from './views/SetupView'
+import { AuthView } from './views/AuthView'
 import { PatientListView } from './views/PatientListView'
 import { PatientFormView } from './views/PatientFormView'
 import { PatientDetailView } from './views/PatientDetailView'
 import { SessionFormView } from './views/SessionFormView'
 
 export default function App() {
-  const [view, setView] = useState<AppView>(() =>
-    isConfigured() ? 'list' : 'setup'
-  )
+  const [configured, setConfigured] = useState(isConfigured())
+  const [view, setView] = useState<AppView>('list')
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
   const [editingSession, setEditingSession] = useState<Session | null>(null)
 
   const { toasts, addToast, removeToast } = useToast()
+  const { user, loading: authLoading, signOut } = configured
+    ? useAuth() // eslint-disable-line react-hooks/rules-of-hooks
+    : { user: null, loading: false, signOut: async () => {} }
 
-  // Re-check config on changes
-  useEffect(() => {
-    if (!isConfigured() && view !== 'setup') {
-      setView('setup')
-    }
-  }, [view])
+  const handleLogout = async () => {
+    await signOut()
+    addToast('Sesión cerrada', 'info')
+  }
 
   const goToList = () => {
     setView('list')
@@ -56,64 +59,67 @@ export default function App() {
     setView('sessionForm')
   }
 
-  // Header props based on current view
   const getHeaderProps = () => {
+    const base = {
+      onLogoClick: goToList,
+      onLogout: handleLogout,
+      userEmail: user?.email,
+    }
     switch (view) {
-      case 'setup':
-        return { onLogoClick: goToList }
       case 'list':
-        return {
-          onLogoClick: goToList,
-          onSettingsClick: () => setView('setup'),
-        }
+        return { ...base, onSettingsClick: () => setConfigured(false) }
       case 'patientForm':
         return {
-          onLogoClick: goToList,
-          title: editingPatient
-            ? `Editar: ${editingPatient.nombre} ${editingPatient.apellido}`
-            : 'Nuevo Paciente',
+          ...base,
+          title: editingPatient ? `Editar: ${editingPatient.nombre} ${editingPatient.apellido}` : 'Nuevo Paciente',
           backLabel: 'Pacientes',
-          onBack: editingPatient && selectedPatient
-            ? () => goToDetail(selectedPatient)
-            : goToList,
+          onBack: editingPatient && selectedPatient ? () => goToDetail(selectedPatient) : goToList,
         }
       case 'detail':
         return {
-          onLogoClick: goToList,
-          title: selectedPatient
-            ? `${selectedPatient.nombre} ${selectedPatient.apellido}`
-            : '',
+          ...base,
+          title: selectedPatient ? `${selectedPatient.nombre} ${selectedPatient.apellido}` : '',
           backLabel: 'Pacientes',
           onBack: goToList,
         }
       case 'sessionForm':
         return {
-          onLogoClick: goToList,
+          ...base,
           title: editingSession ? 'Editar sesión' : 'Nueva sesión',
-          backLabel: selectedPatient
-            ? `${selectedPatient.nombre} ${selectedPatient.apellido}`
-            : 'Paciente',
+          backLabel: selectedPatient ? `${selectedPatient.nombre} ${selectedPatient.apellido}` : 'Paciente',
           onBack: selectedPatient ? () => goToDetail(selectedPatient) : goToList,
         }
       default:
-        return { onLogoClick: goToList }
+        return base
     }
   }
 
-  if (view === 'setup') {
+  // 1. Not configured → Setup
+  if (!configured) {
     return (
       <>
-        <SetupView
-          onComplete={() => {
-            setView('list')
-            addToast('Supabase configurado correctamente', 'success')
-          }}
-        />
+        <SetupView onComplete={() => { setConfigured(true); goToList() }} />
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </>
     )
   }
 
+  // 2. Configured but checking auth session
+  if (authLoading) {
+    return <LoadingScreen message="Verificando sesión..." />
+  }
+
+  // 3. Configured but not logged in → Auth
+  if (!user) {
+    return (
+      <>
+        <AuthView onAuthenticated={goToList} />
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
+      </>
+    )
+  }
+
+  // 4. Fully authenticated → App
   return (
     <div className="min-h-screen bg-slate-50">
       <Header {...getHeaderProps()} />
@@ -130,18 +136,12 @@ export default function App() {
           <PatientFormView
             patient={editingPatient}
             onBack={() => {
-              if (editingPatient && selectedPatient) {
-                goToDetail(selectedPatient)
-              } else {
-                goToList()
-              }
+              if (editingPatient && selectedPatient) goToDetail(selectedPatient)
+              else goToList()
             }}
             onSaved={(patient) => {
               goToDetail(patient)
-              addToast(
-                editingPatient ? 'Paciente actualizado' : 'Paciente creado',
-                'success'
-              )
+              addToast(editingPatient ? 'Paciente actualizado' : 'Paciente creado', 'success')
             }}
             addToast={addToast}
           />
@@ -151,10 +151,7 @@ export default function App() {
           <PatientDetailView
             patient={selectedPatient}
             onBack={goToList}
-            onEditPatient={(p) => {
-              setEditingPatient(p)
-              setView('patientForm')
-            }}
+            onEditPatient={(p) => { setEditingPatient(p); setView('patientForm') }}
             onNewSession={goToNewSession}
             onEditSession={goToEditSession}
             onPatientDeleted={goToList}
@@ -167,9 +164,7 @@ export default function App() {
             patient={selectedPatient}
             session={editingSession}
             onBack={() => goToDetail(selectedPatient)}
-            onSaved={() => {
-              goToDetail(selectedPatient)
-            }}
+            onSaved={() => goToDetail(selectedPatient)}
             addToast={addToast}
           />
         )}

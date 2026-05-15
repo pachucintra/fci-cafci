@@ -32,9 +32,11 @@ export const usePatients = () => {
   const createPatient = async (data: PatientFormData): Promise<Patient | null> => {
     try {
       const client = getClient()
+      const { data: { user } } = await client.auth.getUser()
+      if (!user) throw new Error('No autenticado')
       const { data: created, error: err } = await client
         .from('patients')
-        .insert([data])
+        .insert([{ ...data, user_id: user.id }])
         .select()
         .single()
       if (err) throw err

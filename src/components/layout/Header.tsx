@@ -1,9 +1,11 @@
 import React from 'react'
-import { Activity, ChevronLeft, Settings } from 'lucide-react'
+import { Activity, ChevronLeft, LogOut, Settings } from 'lucide-react'
 
 interface HeaderProps {
   onLogoClick: () => void
   onSettingsClick?: () => void
+  onLogout?: () => void
+  userEmail?: string
   title?: string
   backLabel?: string
   onBack?: () => void
@@ -12,6 +14,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onLogoClick,
   onSettingsClick,
+  onLogout,
+  userEmail,
   title,
   backLabel,
   onBack,
@@ -49,7 +53,12 @@ export const Header: React.FC<HeaderProps> = ({
           </>
         )}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {userEmail && (
+            <span className="hidden sm:block text-xs text-slate-400 max-w-[160px] truncate">
+              {userEmail}
+            </span>
+          )}
           {onSettingsClick && (
             <button
               onClick={onSettingsClick}
@@ -57,6 +66,15 @@ export const Header: React.FC<HeaderProps> = ({
               title="Configuración"
             >
               <Settings className="h-4 w-4" />
+            </button>
+          )}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Cerrar sesión"
+            >
+              <LogOut className="h-4 w-4" />
             </button>
           )}
         </div>
