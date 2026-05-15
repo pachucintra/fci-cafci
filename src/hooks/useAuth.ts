@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
-import { getClient } from '../lib/supabase'
+import { getClient, isConfigured } from '../lib/supabase'
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(isConfigured())
 
   useEffect(() => {
+    if (!isConfigured()) {
+      setLoading(false)
+      return
+    }
+
     const client = getClient()
 
     client.auth.getSession().then(({ data: { session } }) => {

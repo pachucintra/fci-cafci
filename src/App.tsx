@@ -15,15 +15,15 @@ import { SessionFormView } from './views/SessionFormView'
 
 export default function App() {
   const [configured, setConfigured] = useState(isConfigured())
+  const [showSetup, setShowSetup] = useState(!isConfigured())
   const [view, setView] = useState<AppView>('list')
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
   const [editingSession, setEditingSession] = useState<Session | null>(null)
 
   const { toasts, addToast, removeToast } = useToast()
-  const { user, loading: authLoading, signOut } = configured
-    ? useAuth() // eslint-disable-line react-hooks/rules-of-hooks
-    : { user: null, loading: false, signOut: async () => {} }
+  // Always call useAuth unconditionally — it handles unconfigured state internally
+  const { user, loading: authLoading, signOut } = useAuth()
 
   const handleLogout = async () => {
     await signOut()
@@ -67,7 +67,7 @@ export default function App() {
     }
     switch (view) {
       case 'list':
-        return { ...base, onSettingsClick: () => setConfigured(false) }
+        return { ...base, onSettingsClick: () => setShowSetup(true) }
       case 'patientForm':
         return {
           ...base,
@@ -94,22 +94,27 @@ export default function App() {
     }
   }
 
-  // 1. Not configured → Setup
-  if (!configured) {
+  // 1. Not configured or user opened setup → Setup
+  if (showSetup || !configured) {
     return (
       <>
-        <SetupView onComplete={() => { setConfigured(true); goToList() }} />
+        <SetupView onComplete={() => {
+          setConfigured(true)
+          setShowSetup(false)
+          goToList()
+          addToast('Configuración guardada', 'success')
+        }} />
         <ToastContainer toasts={toasts} onRemove={removeToast} />
       </>
     )
   }
 
-  // 2. Configured but checking auth session
+  // 2. Checking auth session
   if (authLoading) {
     return <LoadingScreen message="Verificando sesión..." />
   }
 
-  // 3. Configured but not logged in → Auth
+  // 3. Not logged in → Auth
   if (!user) {
     return (
       <>
